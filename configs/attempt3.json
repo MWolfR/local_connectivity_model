@@ -1,0 +1,25 @@
+{
+    "make_points": {
+        "n_nrn": 20858,
+        "ss_fac" : 7.0,
+        "tgt_sz": 500
+    },
+    "make_matrices": {
+        "lvl2_n": 5,
+        "lvl2_fac": 1.15,
+        "lvl1_n": 5,
+        "lvl1_fac": 1.16,
+        "mapping_p": 0.225,
+        "mapping_n": 8,
+        "reverse_mapping_n": 5,
+        "direction": 1.5707963267948966,
+        "direction_str": 1.25
+    },
+    "wire": {
+        "lvl1_steps": 50,
+        "lvl1_lim": 1500,
+        "lvl2_steps": 50,
+        "lvl2_lim": 15,
+        "p_final": 0.8
+    }
+}
