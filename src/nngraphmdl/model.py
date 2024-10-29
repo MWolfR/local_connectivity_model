@@ -39,28 +39,35 @@ def points_from_microns(cfg):
     return pts, pts_sub, N
 
 # For generating a graph connecting each neuron location to its nearest neighbors.
-def threed2twod(pts, indices=[0, 2]):
-    assert pts.shape[-1] == (len(indices) + 1)
-    idx = numpy.setdiff1d(numpy.arange(pts.shape[-1]), indices)[0]
-    tgt_shape_out = pts.shape[:-1] + (2,)
-    pts = pts.reshape((-1, pts.shape[-1]))
-    h = numpy.sqrt(numpy.sum(pts[:, indices] ** 2, axis=1))
-    return numpy.vstack([pts[:, idx], h]).transpose().reshape(tgt_shape_out)
+def threed2twod(pts, indices=["x", "z"]):
+    col_keep = [_col for _col in pts.columns if _col not in indices]
+    assert len(col_keep) == 1
+    col_keep = col_keep[0]
+    h = numpy.sqrt(numpy.sum(pts[indices].values ** 2, axis=1))
+    return pandas.DataFrame({
+        "x": pts[col_keep].values,
+        "y": h
+    }, index=pts.index)
 
 def angle_based_weights(pts_x, pts, idx, func):
     # 0: horizontal, pi/2: up, -pi/2: down
-    A = pts_x.reshape((-1, 1, 3))
-    B = numpy.dstack([pts[_idx, :] for _idx in idx])
-    B = B.transpose([2, 0, 1])
+    A = pandas.DataFrame(pts_x, columns=pandas.Index(["x", "y", "z"], name="coord"),
+                                    index=pandas.Index(range(len(pts_x)), name="neuron"))
+    B = pandas.concat([pandas.DataFrame(pts[_idx, :], index=pandas.Index(_idx, name="i"),
+                    columns=pandas.Index(["x", "y", "z"], name="coord"))
+                for _idx in idx],
+                axis=0, keys=range(len(idx)), names=["neuron"])
     ab_diff = threed2twod(A - B)
-    angle = numpy.arctan2(ab_diff[:, :, 0], ab_diff[:, :, 1])
+    angle = numpy.arctan2(ab_diff["x"], ab_diff["y"])
     return func(angle)
 
-def to_csc_matrix(idx, w, mirror=True, shape=None):
+def to_csc_matrix(w, mirror=True, shape=None):
     if shape is None:
-        shape = (len(idx), len(idx))
-    idy = [_i * numpy.ones(len(_idx)) for _i, _idx in enumerate(idx)]
-    idx = numpy.hstack(idx); idy = numpy.hstack(idy); w = numpy.hstack(w)
+        raise ValueError("Must provide shape")
+    indices = w.index.to_frame().reset_index(drop=True)
+    idy = indices["neuron"].values
+    idx = indices["i"].values
+    w = w.values
     if mirror:
         _idx = numpy.hstack([idx, idy])
         _idy = numpy.hstack([idy, idx])
@@ -72,7 +79,7 @@ def to_csc_matrix(idx, w, mirror=True, shape=None):
                               shape=shape).tocsc()
     return M
 
-def point_nn_matrix(pts, func, pts_x=None, n_neighbors=4, n_pick=None):
+def point_nn_matrix(pts, func, pts_x=None, n_neighbors=4, dist_neighbors=None, n_pick=None, no_diag=True):
     mirror = False
     if pts_x is None:
         pts_x = pts
@@ -80,24 +87,35 @@ def point_nn_matrix(pts, func, pts_x=None, n_neighbors=4, n_pick=None):
     shape = (len(pts_x), len(pts))
 
     kd = KDTree(pts)
-    _, idx = kd.query(pts_x, numpy.arange(2, 2 + n_neighbors))  # len(idx_x) x n_neighbors
+    if n_neighbors is not None:
+        if no_diag:
+            _, idx = kd.query(pts_x, numpy.arange(2, 2 + n_neighbors))  # len(idx_x) x n_neighbors
+        else:
+            _, idx = kd.query(pts_x, numpy.arange(1, 1 + n_neighbors))  # len(idx_x) x n_neighbors
+    elif dist_neighbors is not None:
+        idx = list(kd.query_ball_point(pts_x, dist_neighbors))
+        if no_diag:
+            idx = [numpy.setdiff1d(_idx, _i) for _i, _idx in enumerate(idx)]  # This is slow. Filter after the fact?
     if n_pick is not None:
-        assert n_pick <= n_neighbors
-        idx = [numpy.random.choice(_idx, n_pick, replace=False)
+        idx = [numpy.random.choice(_idx, numpy.minimum(n_pick, len(_idx)), replace=False)
                for _idx in idx]
     w = angle_based_weights(pts_x, pts, idx, func)
-    return to_csc_matrix(idx, w, mirror=mirror, shape=shape)
+    return to_csc_matrix(w, mirror=mirror, shape=shape)
 
 #######
 # Entrance point 1: Generate matrix.
 #######
 def make_matrices(pts, pts_sub, cfg):
     prefer_down = lambda a: (numpy.cos(a + cfg["direction"]) + 1 + cfg["direction_str"]) / (2 + cfg["direction_str"])
-    uniform = lambda a: numpy.ones_like(a)
-    M12 = point_nn_matrix(pts_sub, uniform, pts_x=pts, n_neighbors=cfg["reverse_mapping_n"])
-    M22 = adjust_p_matrix(point_nn_matrix(pts_sub, prefer_down, n_neighbors=cfg["lvl2_n"]), cfg["lvl2_fac"])
-    M21 = cfg["mapping_p"] * point_nn_matrix(pts, uniform, pts_x=pts_sub, n_neighbors=cfg["mapping_n"]) / cfg["mapping_n"]
-    M11 = adjust_p_matrix(point_nn_matrix(pts, uniform, n_neighbors=cfg["lvl1_n"]), cfg["lvl1_fac"])
+    uniform = lambda a: a.apply(lambda _a: 1.0)
+    M12 = point_nn_matrix(pts_sub, uniform, pts_x=pts, n_neighbors=cfg["reverse_mapping_n"], no_diag=False)
+    M22 = adjust_p_matrix(point_nn_matrix(pts_sub, prefer_down,
+                                          n_neighbors=cfg.get("lvl2_n"), dist_neighbors=cfg.get("lvl2_dist")),
+                          cfg["lvl2_fac"])
+    M21 = cfg["mapping_p"] * point_nn_matrix(pts, uniform, pts_x=pts_sub, n_neighbors=cfg["mapping_n"], no_diag=False) / cfg["mapping_n"]
+    M11 = adjust_p_matrix(point_nn_matrix(pts, uniform,
+                                          n_neighbors=cfg.get("lvl1_n"), dist_neighbors=cfg.get("lvl1_dist")),
+                          cfg["lvl1_fac"])
     return M12, M22, M21, M11
 
 ## Adjusting the weights to ensure a consistent in- and out-degree.
@@ -107,7 +125,7 @@ def adjust_p_matrix(M, mul):
     tmp = M.tocoo()
     eff_deg = (exp_deg - CN[tmp.row, tmp.col].mean())
     deg_ratio = exp_deg / eff_deg
-    return sparse.csr_matrix(mul * deg_ratio * M / M.sum(axis=1))
+    return sparse.csr_matrix(mul * deg_ratio * M / (M.sum(axis=1) + 1E-12))
 
 
 # For wiring up the model, based on the nearest neighbor graph.
