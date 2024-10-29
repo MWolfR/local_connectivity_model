@@ -18,18 +18,23 @@ def make_points(cfg):
 def points_from_microns(cfg):
     import conntility
     fn = cfg["fn"]
-    M = conntility.ConnectivityMatrix.from_h5(fn, "condensed")
+    N = conntility.ConnectivityMatrix.from_h5(fn, "condensed")
     sz = 1000 * cfg["tgt_sz"]
     cols = ["x_nm", "y_nm", "z_nm"]
-    o = pandas.Series({"x_nm": 1000 * cfg["o_x"],
-                       "y_nm": 1000 * cfg["o_y"],
-                       "z_nm": 1000 * cfg["o_z"]})
 
-    center = M.vertices[cols].mean()
-    N = M.index("classification_system").eq("excitatory_neuron")
+    center = N.vertices[cols].mean()
+    for k, v in cfg.get("filters", {"classification_system": "excitatory_neuron"}).items():
+        if isinstance(v, list):
+            N = N.index(k).isin(v)
+        else:
+            N = N.index(k).eq(v)
 
     for _col in cols:
-        N = N.index(_col).le(center[_col] + o[_col] + sz/2).index(_col).ge(center[_col] + o[_col] - sz/2)
+        _col_o = "o_" + _col[0]
+        if _col_o in cfg:
+            _o = 1000 * cfg[_col_o]
+            N = N.index(_col).le(center[_col] + _o + sz/2).index(_col).ge(center[_col] + _o - sz/2)
+            print(len(N))
     
     pts = N.vertices[cols].values / 1000
     n_nrn = len(pts)
