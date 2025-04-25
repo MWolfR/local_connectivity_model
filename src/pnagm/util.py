@@ -34,3 +34,25 @@ def points_from_microns(cfg):
     
     pts = N.vertices[cols].values
     return pts, N
+
+def create_neighbor_spread_graph(pts, cfg, reference=None):
+    from . import nngraph, instance
+
+    w_out_use = None
+    w_in_use = None
+    if "per_class_bias" in cfg:
+        assert reference is not None, "When using per class bias, must provide reference ConnectivityMatrix"
+        if "outgoing" in cfg["per_class_bias"]:
+            prop = cfg["per_class_bias"]["outgoing"]
+            w_out_use = nngraph.generate_custom_weights_by_node_class(reference, prop, 1)
+        if "incoming" in cfg["per_class_bias"]:
+            prop = cfg["per_class_bias"]["incoming"]
+            w_in_use = nngraph.generate_custom_weights_by_node_class(reference, prop, 0)
+        
+    M = nngraph.cand2_point_nn_matrix(pts,
+                                      custom_w_out=w_out_use.values, custom_w_in=w_in_use.values,
+                                      **cfg["nngraph"]).astype(bool).astype(float)
+    mdl_instance, a, b = instance.build_instance(pts, M, **cfg["instance"])
+
+    return mdl_instance, M
+ 
