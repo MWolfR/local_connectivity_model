@@ -1,0 +1,37 @@
+{
+    "_comment": "",
+    "make_points": {
+        "fn": "SSCX_O1_cmat.h5",
+        "filters": {
+            "mtype": [
+                "L4_TPC",
+                "L5_TPC:A",
+                "L5_TPC:B",
+                "L4_SSC",
+                "L5_UPC",
+                "L5_TPC:C"
+            ]
+        },
+        "tgt_sz": 400,
+        "o_x": 0.0,
+        "o_z": 0.0
+    },
+    "per_class_bias":{
+        "outgoing": "mtype",
+        "incoming": "mtype"
+    },
+    "nngraph": {
+        "dist_neighbors": 105.0,
+        "p_pick": 0.2,
+        "mirror": 0
+    },
+    "instance": {
+        "n_steps": 100,
+        "sum_exclusion": 1, 
+        "step_tgt": 3.7, 
+        "n_protected": 8,
+        "fac_protected": 1.0,
+        "tgt_level": "individual",
+        "decay": 0.994
+    }
+}

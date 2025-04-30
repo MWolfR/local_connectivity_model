@@ -3,7 +3,7 @@
     "make_points": {
         "fn": "microns_mm3_connectome_v1181.h5",
         "filters": {
-            "cell_type": ["L3a", "L3b", "L2a", "L2b", "L2c"]
+            "cell_type": ["L4b", "L4a", "L4c", "L5a", "L5ET", "L5NP", "L5b"]
         },
         "o_x": -250.0,
         "tgt_sz": 600
@@ -13,17 +13,17 @@
         "incoming": "cell_type"
     },
     "nngraph": {
-        "directionality_fac": 0.6,
+        "directionality_fac": 0.33,
         "directionality_axis": [0.0, 1.0, 0.0],
-        "dist_neighbors": 48.0,
-        "p_pick": 0.028,
+        "dist_neighbors": 47.0,
+        "p_pick": 0.029,
         "mirror": 0,
-        "scale_axes": [1.0, 1.5, 1.0]
+        "scale_axes": [1.0, 2.25, 1.0]
     },
     "instance": {
         "n_steps": 100,
         "sum_exclusion": 1, 
-        "step_tgt": 2.45, 
+        "step_tgt": 2.52, 
         "n_protected": 6,
         "fac_protected": 1.0,
         "tgt_level": "individual",

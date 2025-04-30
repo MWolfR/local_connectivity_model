@@ -2,6 +2,9 @@ import numpy
 import pandas
 from scipy.spatial.distance import pdist, squareform
 from scipy.spatial import KDTree
+from scipy import stats, sparse
+
+from matplotlib import pyplot as plt
 
 
 dbins = numpy.linspace(0, 1000, 30)
@@ -49,39 +52,92 @@ class DDtest(object):
             self.deltas[j][coo.row, coo.col],
             bins=(dbins2d, dbins2d))[0]
         return H / self.h_2d_all[ij]
-    
-    def plot_degree_distribution(self, mdl_instance, nbins=71):
-        from matplotlib import pyplot as plt
 
-        reference = self.m.matrix.astype(bool)
-        mdl_instance = mdl_instance.astype(bool)
+    def degree_distribution_analysis(self, mdl_sources, mdl_sources_names):
+        n_deg_bins = 31
 
-        df_degrees = pandas.DataFrame({
-            "indegree_model": numpy.array(mdl_instance.sum(axis=0))[0],
-            "indegree_ref": numpy.array(reference.sum(axis=0))[0],
-            "outdegree_model": numpy.array(mdl_instance.sum(axis=1))[:, 0],
-            "outdegree_ref": numpy.array(reference.sum(axis=1))[:, 0]
-        })
+        def node_inout_degrees(m, pts):
+            m = m.astype(bool)
+            df_degrees = pandas.DataFrame({
+                "indegree": numpy.array(m.sum(axis=0))[0],
+                "outdegree": numpy.array(m.sum(axis=1))[:, 0]
+            })
+            return df_degrees
 
-        print(df_degrees.mean())
-        mx_degree = df_degrees.apply(lambda _x: numpy.percentile(_x, 99)).max()
-        deg_bins = numpy.linspace(0, mx_degree, nbins)
-        df_dgtz = df_degrees.apply(lambda _x: numpy.digitize(_x, bins=deg_bins) - 1)
-        df_count = df_dgtz.apply(lambda _x: _x.value_counts().sort_index())
+        def fit_log_distribution(x):
+            if not hasattr(x, "__len__"):
+                return numpy.nan
+            logx = numpy.log10(x)
+            valid = ~numpy.isnan(logx) & ~numpy.isinf(logx)
+            return numpy.polyfit(deg_bins[:-1][valid], logx[valid], 1)[0]
 
-        fig = plt.figure()
+        deg_types = ["indegree", "outdegree"]
+        deg_analysis = {
+            "analyses": {
+                "degrees":{
+                    "source": node_inout_degrees,
+                    "output": "DataFrame"
+                }
+            }
+        }
+        deg_res = pandas.concat(
+            [
+                self.m.analyze(deg_analysis)["degrees"]
+            ] + [
+                _src.analyze(deg_analysis)["degrees"].reset_index(0)
+                for _src in mdl_sources
+            ],
+            axis=0, keys=["reference"] + mdl_sources_names, names=["source"]
+        ).fillna(0)
+        mx_deg = numpy.percentile(deg_res["outdegree"].loc["reference"], 99)
+        deg_bins = numpy.linspace(0, mx_deg, n_deg_bins)
 
-        ax = fig.gca()
+        plt_kwargs = {
+            "reference": {"color": "black", "lw": 1.5, "marker": "o", "ms": 5},
+            "model": {"color": "red", "lw": 0.5, "marker": "o", "ms": 3},
+            "control": {"color": "teal", "lw": 0.5, "marker": "o", "ms": 3}
+        }
 
-        ax.plot(deg_bins[df_count.index], df_count["indegree_model"], marker='x', lw=0.5, color="blue", label="Indeg. model")
-        ax.plot(deg_bins[df_count.index], df_count["indegree_ref"], marker='o', lw=0.5, color="teal", label="Indeg. Ref.")
-        ax.plot(deg_bins[df_count.index], df_count["outdegree_model"], marker='x', lw=0.5, color="orange", label="Outdeg. model")
-        ax.plot(deg_bins[df_count.index], df_count["outdegree_ref"], marker='o', lw=0.5, color="red", label="Outdeg. ref")
+        fig = plt.figure(figsize=(5, 2.2))
 
-        ax.set_xlabel("Degree")
-        ax.set_ylabel("Neuron count")
-        ax.set_yscale("log")
-        plt.legend()
+        fit_res = []
+        for i, col_use in enumerate(deg_types):
+            Hs = deg_res.groupby(["source", "instance"])[col_use].apply(lambda _x: numpy.histogram(_x, bins=deg_bins)[0]).unstack("source")
+            fit_res.append(Hs.applymap(fit_log_distribution))
+
+            ax = fig.add_subplot(1, 2, i + 1)
+
+            for src in Hs.columns:
+                H = Hs[src]
+                for j, data in H.items():
+                    lbl = None
+                    if j == 0:
+                        lbl = src
+                    if hasattr(data, "__len__"):
+                        ax.plot(deg_bins[:-1], data, **plt_kwargs[src], label=lbl)
+            ax.set_yscale("log")
+            ax.set_xlabel(col_use)
+            if i == 0: 
+                ax.set_ylabel("count")
+                plt.legend()
+            ax.set_frame_on(False)
+
+        fit_res = pandas.concat(fit_res, axis=1, keys=deg_types, names=["degree type"])
+        fig2 = plt.figure(figsize=(1., 2))
+        ax = fig2.gca()
+        o = 0
+        for i, col_use in enumerate(deg_types):
+            fit_res_type = fit_res[col_use]
+            for src in fit_res_type.columns:
+                if src == "control":
+                    continue
+                ax.bar(o, fit_res_type[src].mean(), color=plt_kwargs[src]["color"])
+                ax.errorbar(o, fit_res_type[src].mean(), yerr=fit_res_type[src].std(), color=plt_kwargs[src]["color"])
+                o += 1
+        ax.set_xticks(numpy.arange(len(deg_types)) * 2 + 0.5); ax.set_xticklabels(deg_types, rotation="vertical")
+        ax.set_ylabel("Slope")
+        ax.set_frame_on(False)
+        return fig, fig2
 
     def dist_and_nn_analysis(self, matrix, direction="efferent"):
         if direction == "efferent":
@@ -104,7 +160,10 @@ class DDtest(object):
             dists_x_con.extend(_d[is_con])  # distances of neurons that have their nn connected and themselves connected
         H_x_all = numpy.histogram(dists_x_all, bins=dbins)[0]
         H_x_con = numpy.histogram(dists_x_con, bins=dbins)[0]
-        return H_x_con / H_x_all  # Probability that a neuron with connected NN is connected itself (per dist bin)
+        
+        ret = H_x_con / H_x_all  # Probability that a neuron with connected NN is connected itself (per dist bin)
+        ret[H_x_all < 10] = numpy.nan  # Where insufficient num samples: make nan
+        return ret
 
     @staticmethod
     def simplex_counts_and_controls(matrix):
@@ -129,6 +188,48 @@ class DDtest(object):
         res.append(connalysis.network.simplex_counts(O, max_dim=10))
         return pandas.concat(res, axis=0, keys=keys)
     
+    @staticmethod
+    def simplex_counts_over_instances(instances):
+        all_smplx_model = pandas.concat([
+            DDtest.simplex_counts_and_controls(_instance)
+            for _instance in instances
+        ], axis=1, names=["instance"], keys=range(len(instances)))
+        return all_smplx_model
+    
+    def simplex_count_analysis(self, src_instances, src_labels):
+        res_reference = self.simplex_counts_and_controls(self.m.matrix)
+        res_reference = pandas.concat([res_reference], axis=1)
+        res_srcs = [
+            self.simplex_counts_over_instances(_src)
+            for _src in src_instances
+        ]
+        fig = plt.figure(figsize=(8, 2))
+        axes = fig.subplots(1, 3, sharey=True, sharex=True)
+
+        cols = {"Original": "black", "ER": "red", "Config. model": "orange", "Bishuffled model": "purple"}
+
+        for src, ttl, ax in zip([res_reference] + res_srcs,
+                                ["reference"] + src_labels,
+                                axes):
+            for i in src.columns:
+                smplx_model = src[i].unstack(fill_value=0)
+                for mdl in smplx_model.index:
+                    ax.plot(smplx_model.loc[mdl], color=cols[mdl], marker='o', ms=3, lw=0.5)
+
+            smplx_model = src.mean(axis=1).unstack(fill_value=0)
+            for mdl in smplx_model.index:
+                ax.plot(smplx_model.loc[mdl], label=mdl, color=cols[mdl], lw=2.0)
+
+            ax.set_title(ttl)
+            ax.set_xticks(numpy.arange(8))
+            ax.set_xlabel("Dimension")
+            if ttl == "reference":
+                ax.set_ylabel("Simplex count")
+            ax.set_frame_on(False)
+            plt.legend()
+        return fig
+
+    
     def plot_simplex_counts(self, matrix):
         from matplotlib import pyplot as plt
 
@@ -151,3 +252,80 @@ class DDtest(object):
             ax.plot(smplx_ref.loc[mdl], label=mdl, color=cols[mdl], marker='o')
         ax.set_title("Reference")
         ax.set_xlabel("Dimension"); ax.set_ylabel("Count")
+
+def nnz(m, pts):
+    return m.nnz
+
+def mean_degree(m, pts):
+    n = m.shape[0]
+    return nnz(m, pts) / n
+
+def _cn_bias(m, pts, direction):
+    if m.nnz == 0:
+        return numpy.NaN
+    m = m.astype(bool)
+    adj = m.astype(float)
+    assert adj.shape[0] == adj.shape[1], "Matrix must be square for this analysis!"
+    nelem = adj.shape[0] * adj.shape[1]
+    ndiag = adj.shape[0]
+    ncon = adj.nnz
+    nuncon = nelem - ndiag - ncon
+
+    if direction == "efferent":
+        cn = adj * adj.transpose()
+    elif direction == "afferent":
+        cn = adj.transpose() * adj
+    else:
+        raise ValueError("direction must be 'efferent' or 'afferent'")
+    mn_elem = cn.mean()
+    mn_diag = cn[numpy.diag_indices_from(cn)].mean()
+    mn_con = cn[m].mean()
+    mn_uncon = (mn_elem * nelem - mn_diag * ndiag - mn_con * ncon) / nuncon
+
+    return mn_con / mn_uncon
+
+def cn_bias_aff(m, pts):
+    return _cn_bias(m, pts, "afferent")
+
+def cn_bias_eff(m, pts):
+    return _cn_bias(m, pts, "efferent")
+
+def _skewness_deg_dist_fit(m, pts, direction):
+    m = m.tocoo()
+    if m.nnz == 0:
+        return numpy.NaN
+    if direction == "efferent":
+        degs = pandas.Series(m.row).value_counts()
+    elif direction == "afferent":
+        degs = pandas.Series(m.col).value_counts()
+
+    d_shape, d_loc, d_scale = stats.lognorm.fit(degs)
+    return (numpy.exp(d_shape ** 2) + 2) * numpy.sqrt(numpy.exp(d_shape ** 2) - 1)
+
+def _skewness_deg_dist_samples(m, pts, direction):
+    m = m.tocoo()
+    if m.nnz == 0:
+        return numpy.NaN
+    if direction == "efferent":
+        degs = pandas.Series(m.row).value_counts()
+    elif direction == "afferent":
+        degs = pandas.Series(m.col).value_counts()
+
+    return stats.skew(degs.values)
+
+def skewness_deg_dist_eff(m, pts):
+    return _skewness_deg_dist_samples(m, pts, "efferent")
+
+def skewness_deg_dist_aff(m, pts):
+    return _skewness_deg_dist_samples(m, pts, "afferent")
+
+def con_prob_within(m, pts, max_dist=50.0):
+    m = m.tocsr().astype(bool)
+    pts = pts[["x", "y", "z"]].values
+    tree = KDTree(pts)
+    idx = tree.query_ball_point(pts, max_dist)
+    idx = [_idx[1:] for _idx in idx]
+    l = numpy.cumsum([0] + list(map(len, idx)))
+    idx_stack = numpy.hstack(idx)
+    m_idx = sparse.csr_matrix((numpy.ones(len(idx_stack), dtype=bool), idx_stack, l), shape=(len(pts), len(pts)))
+    return m[m_idx].mean()

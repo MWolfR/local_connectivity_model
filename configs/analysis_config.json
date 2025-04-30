@@ -1,0 +1,44 @@
+{
+    "analyses": {
+        "nnz": {
+            "source": "pnagm/test.py",
+            "method": "nnz",
+            "output": "Value"
+        },
+        "mean_degree": {
+            "source": "pnagm/test.py",
+            "method": "mean_degree",
+            "output": "Value"
+        },
+        "cn_bias_aff": {
+            "source": "pnagm/test.py",
+            "method": "_cn_bias",
+            "args": ["afferent"],
+            "output": "Value"
+        },
+        "cn_bias_eff": {
+            "source": "pnagm/test.py",
+            "method": "_cn_bias",
+            "args": ["efferent"],
+            "output": "Value"
+        },
+        "skewness_aff": {
+            "source": "pnagm/test.py",
+            "method": "_skewness_deg_dist_samples",
+            "args": ["afferent"],
+            "output": "Value"
+        },
+        "skewness_eff": {
+            "source": "pnagm/test.py",
+            "method": "_skewness_deg_dist_samples",
+            "args": ["efferent"],
+            "output": "Value"
+        },
+        "con_prob": {
+            "source": "pnagm/test.py",
+            "method": "con_prob_within",
+            "args": [75.0],
+            "output": "Value"
+        }
+    }
+}

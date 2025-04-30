@@ -1,0 +1,21 @@
+{
+    "_comment": "",
+    "make_points": {
+        "n_nrn": 5000,
+        "tgt_sz": 500
+    },
+    "nngraph": {
+        "dist_neighbors": 70.0,
+        "p_pick": 0.1,
+        "mirror": 0
+    },
+    "instance": {
+        "n_steps": 100,
+        "sum_exclusion": 1, 
+        "step_tgt": 2.5, 
+        "n_protected": 0,
+        "fac_protected": 1.0,
+        "tgt_level": "individual",
+        "decay": 1.0
+    }
+}

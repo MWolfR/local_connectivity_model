@@ -87,13 +87,14 @@ def non_isotropic_dist(pts_x, pts, idx, directionality_fac=0, directionality_axi
 
 def generate_custom_weights_by_node_class(reference, property_to_use, axis):
     c = reference.vertices[property_to_use].value_counts().sort_index()
-    nrml = c.values.reshape((-1, 1)) * c.values.reshape((1, -1))
+    nrml = c.values.reshape((-1, 1)) * c.values.reshape((1, -1)) + 1E-9 # Number of pairs
 
-    MM = reference.condense(property_to_use).array / nrml
-
-    w_per_class = MM.mean(axis=axis) / numpy.sqrt(MM.mean())
+    MM = reference.condense(property_to_use).array
+    MM = MM / nrml  # Connection prob
+    MM = MM.mean() * (MM ** 1.5) / (MM ** 1.5).mean()
+    w_per_class = numpy.nanmean(MM, axis=axis) / numpy.sqrt(numpy.nanmean(MM))
     w_per_class = pandas.Series(w_per_class, name="weight", index=c.index)
-    w_per_node = w_per_class[reference.vertices[property_to_use]]
+    w_per_node = w_per_class[reference.vertices[property_to_use]].values
     return w_per_node
 
 
@@ -238,6 +239,7 @@ def cand2_point_nn_matrix(pts, pts_x=None, n_neighbors=4, dist_neighbors=None, n
     w = non_isotropic_dist(pts_x, pts, idx, distance_func=distance_func,
                            directionality_axis=directionality_axis,
                            directionality_fac=directionality_fac)
+    
     if custom_w_in is not None and custom_w_out is not None:
         cust_w = custom_weight_evaluation(custom_w_out, custom_w_in, idx)
         cust_w = cust_w / cust_w.mean()
@@ -253,5 +255,8 @@ def cand2_point_nn_matrix(pts, pts_x=None, n_neighbors=4, dist_neighbors=None, n
         picker_func = lambda _x: _x.iloc[numpy.random.choice(len(_x), numpy.minimum(n_pick, len(_x)),
                                                              replace=False,
                                                              p=_x / _x.sum())]
-    w = w.groupby("neuron").apply(picker_func).droplevel(0)
-    return to_csc_matrix(w, mirror=mirror, shape=shape)
+    w = w.groupby("neuron").apply(picker_func)
+    if len(w) > 0:
+        w = w.droplevel(0)
+        return to_csc_matrix(w, mirror=mirror, shape=shape)
+    return sparse.csc_matrix((len(pts), len(pts)), dtype=bool)

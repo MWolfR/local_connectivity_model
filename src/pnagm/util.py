@@ -8,14 +8,34 @@ def make_points(cfg):
     pts = numpy.random.rand(n_nrn, 3) * tgt_sz - tgt_sz/2
     return pts
 
+def no_categorical_dtypes(N):
+    import pandas
+
+    for col in N._vertex_properties.columns:
+        if isinstance(N._vertex_properties[col].dtype, pandas.CategoricalDtype):
+            N._vertex_properties[col] = N._vertex_properties[col].astype(str)
+
 def points_from_microns(cfg):
     import conntility
     fn = cfg["fn"]
-    N = conntility.ConnectivityMatrix.from_h5(fn, "condensed")
+    try:
+        N = conntility.ConnectivityMatrix.from_h5(fn, "condensed")
+    except:
+        N = conntility.ConnectivityMatrix.from_h5(fn)
+    no_categorical_dtypes(N)
+    
     sz = cfg["tgt_sz"]
     cols = ["x_nm", "y_nm", "z_nm"]
     for _col in cols:
-        N._vertex_properties[_col[0]] = N._vertex_properties[_col] / 1000.0
+        if _col in N._vertex_properties.columns:
+            N._vertex_properties[_col[0]] = N._vertex_properties[_col] / 1000.0
+    
+    tl_col_dict = {
+        "ss_flat_x": "x", "ss_flat_y": "z", "depth": "y"
+    }
+    for _col_in, _col_out in tl_col_dict.items():
+        if _col_in in N._vertex_properties.columns:
+            N._vertex_properties[_col_out] = N._vertex_properties[_col_in] + numpy.random.rand(len(N)) * 1E-9
     cols = ["x", "y", "z"]
 
     center = N.vertices[cols].mean()
@@ -50,7 +70,7 @@ def create_neighbor_spread_graph(pts, cfg, reference=None):
             w_in_use = nngraph.generate_custom_weights_by_node_class(reference, prop, 0)
         
     M = nngraph.cand2_point_nn_matrix(pts,
-                                      custom_w_out=w_out_use.values, custom_w_in=w_in_use.values,
+                                      custom_w_out=w_out_use, custom_w_in=w_in_use,
                                       **cfg["nngraph"]).astype(bool).astype(float)
     mdl_instance, a, b = instance.build_instance(pts, M, **cfg["instance"])
 

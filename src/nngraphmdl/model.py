@@ -4,6 +4,7 @@ import pandas
 from scipy import sparse
 from scipy import stats
 from scipy.spatial import KDTree
+from scipy.spatial.distance import cdist
 
 # For the random or non-random generation of neuron locations in space
 def make_points(cfg):
@@ -56,9 +57,9 @@ def threed2twod(pts, indices=["x", "z"]):
 
 def angle_based_weights(pts_x, pts, idx, func):
     # 0: horizontal, pi/2: up, -pi/2: down
-    A = pandas.DataFrame(pts_x, columns=pandas.Index(["x", "y", "z"], name="coord"),
+    A = pandas.DataFrame(pts_x[:, :3], columns=pandas.Index(["x", "y", "z"], name="coord"),
                                     index=pandas.Index(range(len(pts_x)), name="neuron"))
-    B = pandas.concat([pandas.DataFrame(pts[_idx, :], index=pandas.Index(_idx, name="i"),
+    B = pandas.concat([pandas.DataFrame(pts[_idx, :3], index=pandas.Index(_idx, name="i"),
                     columns=pandas.Index(["x", "y", "z"], name="coord"))
                 for _idx in idx],
                 axis=0, keys=range(len(idx)), names=["neuron"])
@@ -84,15 +85,21 @@ def to_csc_matrix(w, mirror=True, shape=None):
                               shape=shape).tocsc()
     return M
 
-def point_nn_matrix(pts, func, pts_x=None, n_neighbors=4, dist_neighbors=None, n_pick=None, no_diag=True):
-    mirror = False
+def _pick_by_distance_exponential(_idx, pts_fr, pts_to, p_pick, decay_pick):
+    _p = numpy.exp(-cdist(pts_fr, pts_to)[0] / decay_pick)
+    _p = p_pick * _p / _p.mean()
+    return numpy.array(_idx)[numpy.random.rand(len(_p)) <= _p]
+
+def point_nn_matrix(pts, func, pts_x=None, n_neighbors=4, dist_neighbors=None, n_pick=None,
+                    p_pick=None, decay_pick=None,
+                    no_diag=True, mirror=False):
     if pts_x is None:
         pts_x = pts
         mirror = False
     shape = (len(pts_x), len(pts))
 
     kd = KDTree(pts)
-    if n_neighbors is not None:
+    if n_neighbors is not None and dist_neighbors is None:
         if no_diag:
             _, idx = kd.query(pts_x, numpy.arange(2, 2 + n_neighbors))  # len(idx_x) x n_neighbors
         else:
@@ -101,7 +108,20 @@ def point_nn_matrix(pts, func, pts_x=None, n_neighbors=4, dist_neighbors=None, n
         idx = list(kd.query_ball_point(pts_x, dist_neighbors))
         if no_diag:
             idx = [numpy.setdiff1d(_idx, _i) for _i, _idx in enumerate(idx)]  # This is slow. Filter after the fact?
-    if n_pick is not None:
+    if p_pick is not None:
+        assert p_pick <= 1.0
+        if decay_pick is not None:
+            idx = [
+                _pick_by_distance_exponential(_idx, pts[[_i]], pts[_idx], p_pick, decay_pick)
+                for _i, _idx in enumerate(idx)
+            ]
+        else:
+            idx = [numpy.random.choice(_idx, 
+                                    numpy.maximum(stats.binom(len(_idx), p_pick).rvs(), 1),
+                                    replace=False)
+                    if len(_idx) > 0 else numpy.array([], dtype=int)
+                for _idx in idx]
+    elif n_pick is not None:
         idx = [numpy.random.choice(_idx, numpy.minimum(n_pick, len(_idx)), replace=False)
                for _idx in idx]
     w = angle_based_weights(pts_x, pts, idx, func)
@@ -132,9 +152,33 @@ def adjust_p_matrix(M, mul):
     deg_ratio = exp_deg / eff_deg
     return sparse.csr_matrix(mul * deg_ratio * M / (M.sum(axis=1) + 1E-12))
 
+def _evaluate_probs_less_random(p_mat, adjust=None):
+    p_mat = p_mat.tocsr()
+    n_pick = numpy.array(p_mat.sum(axis=1))[:, 0]
+    if adjust is not None:
+        n_pick = n_pick * adjust
+    n_pick = numpy.round(n_pick).astype(int)
+
+    indptr_out = [0]
+    picked = []
+    for a, b, c in zip(p_mat.indptr[:-1], p_mat.indptr[1:], n_pick):
+        p = p_mat.data[a:b] / p_mat.data[a:b].sum()
+        c = numpy.minimum(c, (p > 0).sum())
+        indptr_out.append(c)
+        if c > 0:
+            picked.append(numpy.random.choice(p_mat.indices[a:b], c, p=p, replace=False))
+    picked = numpy.hstack(picked)
+    indptr_out = numpy.cumsum(indptr_out)
+    m_out = sparse.csr_matrix((numpy.ones(indptr_out[-1], dtype=bool), 
+                            numpy.hstack(picked),
+                            indptr_out),
+                            shape=p_mat.shape).tocoo()
+    return m_out
 
 # For wiring up the model, based on the nearest neighbor graph.
-def evaluate_probs(p_mat, adjust=None):
+def evaluate_probs(p_mat, adjust=None, less_random=False):
+    if less_random:
+        return _evaluate_probs_less_random(p_mat, adjust=adjust)
     p_mat = p_mat.tocoo()
     thresh = p_mat.data
     if adjust is not None:
