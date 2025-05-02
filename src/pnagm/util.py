@@ -4,7 +4,10 @@ import numpy
 # For the random or non-random generation of neuron locations in space
 def make_points(cfg):
     n_nrn = cfg["n_nrn"]
-    tgt_sz = cfg["tgt_sz"] 
+    tgt_sz = cfg["tgt_sz"]
+    if not hasattr(tgt_sz, "__iter__"):
+        tgt_sz = [tgt_sz, tgt_sz, tgt_sz]
+    tgt_sz = numpy.array(tgt_sz).reshape((1, -1))
     pts = numpy.random.rand(n_nrn, 3) * tgt_sz - tgt_sz/2
     return pts
 
