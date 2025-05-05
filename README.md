@@ -26,7 +26,7 @@ The functionality is split between four python files:
  - **test.py**: Contains functionality for comparing a generated graph to a reference and generate plots to that effect.
 
 ## Configuration
-All parameterization is performed in .json files. Json files that have been used to generate the figures in the manuscript can be found under /configs.
+We use parameterization that is written into .json files. Json files that have been used to generate the figures in the manuscript can be found under /configs.
 
 Briefly, the files have four sections:
  - **make_points**: Parameterizes the generation of a point cloud that the graph(s) are generated on. This comes in two variants: Loading the soma positions from a reference connectome, or generating a random point cloud.
@@ -37,6 +37,21 @@ Briefly, the files have four sections:
  The entries of "per_class_bias" specify a node property of a reference connectome (such as neuron type). The strengths of pathways with respect to that property are then approximately reproduced by calculating "per node biases" as described in the accompanying manuscript.
 
  For the other three sections, entries directly correspond to kwargs of python functions in the files listed above. Refer to the function docstrings for details.
+
+ ### Simply getting started
+ "Configuration file? That is all too complicated for me. Just tell me how to build S_q(G_{d,p}(P)), as you define it in the manuscript".
+
+> import numpy
+> from pnagm.nngraph import cand2_point_nn_matrix
+> from pnagm.instance import build_instance
+
+> P = numpy.random.rand(1000, 3) * 50
+> p = 0.2  # parameter as defined in the manuscript
+> d = 10  # as in the manuscript
+> q = 2.5  # as in the manuscript
+
+> G = cand2_point_nn_matrix(P, dist_neighbors=d, p_pick=p)  # Builds the random geometric graph
+> S, _, _ = build_instance(P, G, step_tgt=q)  # Build stochastic spread graph on it
 
 # Notebooks
  - **Characterization.ipynb**: Performs sweeps over the paramters of the graph model for the purpose of characterization. Produces panels for *Fig 1C, D* of the manuscript.
