@@ -1,5 +1,5 @@
 {
-    "_comment": "",
+    "_comment": "The .h5 file holding the reference connectome below: DOI: 10.5281/zenodo.13849415",
     "make_points": {
         "fn": "microns_mm3_connectome_v1181.h5",
         "filters": {

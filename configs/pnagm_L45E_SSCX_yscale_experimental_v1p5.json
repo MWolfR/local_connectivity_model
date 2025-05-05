@@ -1,5 +1,5 @@
 {
-    "_comment": "",
+    "_comment": "The .h5 file holding the reference connectome below: DOI: 10.5281/zenodo.10079406",
     "make_points": {
         "fn": "SSCX_O1_cmat.h5",
         "filters": {
