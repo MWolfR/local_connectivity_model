@@ -1,0 +1,7 @@
+scipy>=1.13.0
+pandas>=2.2.3
+numpy>=1.26.4
+networkx>=3.2.0
+Connectome-Utilities>=0.4.10
+connectome_analysis>=1.0.2
+matplotlib>=3.9.4
