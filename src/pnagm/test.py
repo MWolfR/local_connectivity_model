@@ -15,7 +15,20 @@ def calc_delta_matrix(col):
     return col.reshape((-1, 1)) - col.reshape((1, -1))
 
 class DDtest(object):
+    """
+    An object that facilitates comparing a random graph to a reference with respect to a number
+    of graph measurements.
+
+    NOTE: This class is very much optimized for use with the specific references connectomes we 
+    considered in the manuscript and may require changes for other connectomes.
+    """
     def __init__(self, instance, cols=["x", "y", "z"]):
+        """
+        Args:
+          instance (conntility.ConnectivityMatrix): The reference connectome
+
+          cols (list): The name of the node properties of the reference to use for distance calculations.
+        """
         self.m = instance
         pts = self.m.vertices[cols].values
         self.pts = pts
@@ -54,6 +67,9 @@ class DDtest(object):
         return H / self.h_2d_all[ij]
 
     def degree_distribution_analysis(self, mdl_sources, mdl_sources_names):
+        """
+        Fig. 2D1
+        """
         n_deg_bins = 31
 
         def node_inout_degrees(m, pts):
@@ -140,6 +156,9 @@ class DDtest(object):
         return fig, fig2
 
     def dist_and_nn_analysis(self, matrix, direction="efferent"):
+        """
+        Fig. 2D
+        """
         if direction == "efferent":
             O = matrix.tocsr()
         elif direction == "afferent":
@@ -167,6 +186,9 @@ class DDtest(object):
 
     @staticmethod
     def simplex_counts_and_controls(matrix):
+        """
+        Utility function for: Fig. 2E
+        """
         import connalysis
         O = matrix.tocsc()
         keys = []
@@ -190,6 +212,9 @@ class DDtest(object):
     
     @staticmethod
     def simplex_counts_over_instances(instances):
+        """
+        Utility function for: Fig. 2E
+        """
         all_smplx_model = pandas.concat([
             DDtest.simplex_counts_and_controls(_instance)
             for _instance in instances
@@ -197,6 +222,9 @@ class DDtest(object):
         return all_smplx_model
     
     def simplex_count_analysis(self, src_instances, src_labels):
+        """
+        Utility function for: Fig. 2E
+        """
         res_reference = self.simplex_counts_and_controls(self.m.matrix)
         res_reference = pandas.concat([res_reference], axis=1)
         res_srcs = [
@@ -231,6 +259,9 @@ class DDtest(object):
 
     
     def plot_simplex_counts(self, matrix):
+        """
+        Fig. 2E
+        """
         from matplotlib import pyplot as plt
 
         smplx_model = self.simplex_counts_and_controls(matrix).unstack(fill_value=0)
@@ -254,13 +285,22 @@ class DDtest(object):
         ax.set_xlabel("Dimension"); ax.set_ylabel("Count")
 
 def nnz(m, pts):
+    """
+    Number of nonzero elements of a matrix / edges of a graph.
+    """
     return m.nnz
 
 def mean_degree(m, pts):
+    """
+    Mean degree of nodes in a graph.
+    """
     n = m.shape[0]
     return nnz(m, pts) / n
 
 def _cn_bias(m, pts, direction):
+    """
+    Strength of common neighbor bias, as defined in the manuscript Methods,
+    """
     if m.nnz == 0:
         return numpy.NaN
     m = m.astype(bool)
@@ -285,12 +325,21 @@ def _cn_bias(m, pts, direction):
     return mn_con / mn_uncon
 
 def cn_bias_aff(m, pts):
+    """
+    Strength of afferent common neighbor bias. Not used in the manuscript.
+    """
     return _cn_bias(m, pts, "afferent")
 
 def cn_bias_eff(m, pts):
+    """
+    Strength of efferent common neighbor bias. This one's used in the manuscript.
+    """
     return _cn_bias(m, pts, "efferent")
 
 def _skewness_deg_dist_fit(m, pts, direction):
+    """
+    Skewness of a lognormal distribution fit to the degree distribution of a graph.
+    """
     m = m.tocoo()
     if m.nnz == 0:
         return numpy.NaN
@@ -303,6 +352,9 @@ def _skewness_deg_dist_fit(m, pts, direction):
     return (numpy.exp(d_shape ** 2) + 2) * numpy.sqrt(numpy.exp(d_shape ** 2) - 1)
 
 def _skewness_deg_dist_samples(m, pts, direction):
+    """
+    Skewness of the degree distribution of a graph as scipy.stats calculates it.
+    """
     m = m.tocoo()
     if m.nnz == 0:
         return numpy.NaN
@@ -314,12 +366,22 @@ def _skewness_deg_dist_samples(m, pts, direction):
     return stats.skew(degs.values)
 
 def skewness_deg_dist_eff(m, pts):
+    """
+    Skewness of the out-degree distribution of a graph.
+    """
     return _skewness_deg_dist_samples(m, pts, "efferent")
 
 def skewness_deg_dist_aff(m, pts):
+    """
+    Skewness of the in-degree distribution of a graph.
+    """
     return _skewness_deg_dist_samples(m, pts, "afferent")
 
 def con_prob_within(m, pts, max_dist=50.0):
+    """
+    Connection probability within the specifed distance for a graph where nodes
+    are associated with x, y, z coordinates.
+    """
     m = m.tocsr().astype(bool)
     pts = pts[["x", "y", "z"]].values
     tree = KDTree(pts)

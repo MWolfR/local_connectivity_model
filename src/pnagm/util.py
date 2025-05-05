@@ -3,6 +3,9 @@ import numpy
 
 # For the random or non-random generation of neuron locations in space
 def make_points(cfg):
+    """
+    Generate a random point cloude from a parameterization dict.
+    """
     n_nrn = cfg["n_nrn"]
     tgt_sz = cfg["tgt_sz"]
     if not hasattr(tgt_sz, "__iter__"):
@@ -12,6 +15,10 @@ def make_points(cfg):
     return pts
 
 def no_categorical_dtypes(N):
+    """
+    Utility function: Turns categorical node properties into non-categorical ones. This is required
+    for some analyses for technical reasons.
+    """
     import pandas
 
     for col in N._vertex_properties.columns:
@@ -19,6 +26,14 @@ def no_categorical_dtypes(N):
             N._vertex_properties[col] = N._vertex_properties[col].astype(str)
 
 def points_from_microns(cfg):
+    """
+    Generate a point cloud by looking up soma locations from a reference connectome. The reference could
+    be the MICrONS EM connectome, hence the name. But in principle any source can be used, as long as it 
+    provides soma locations. 
+
+    Args:
+      cfg: dict configuring the process, i.e., which connectome to load and which subvolume to select.
+    """
     import conntility
     fn = cfg["fn"]
     try:
@@ -59,6 +74,20 @@ def points_from_microns(cfg):
     return pts, N
 
 def create_neighbor_spread_graph(pts, cfg, reference=None):
+    """
+    Utility function that combines generation of a random geometric graph and generation of a stochastic
+    spread graph on the first graph. 
+
+    Args:
+      pts (numpy.array; m x n): Locations of m nodes in n-dimensional space.
+
+      cfg (dict): Configures generation of the two graphs. For details, see README and the docstrings of
+      pnagm.nngraph.cand2_point_nn_matrix and instance.build_instance.
+
+      reference (optional; conntility.ConnectivityMatrix): If "per_class_bias" is used for the generation of
+      the random geometric graph, then a reference connectome is required. See README and 
+      nngraph.generate_custom_weights_by_node_class for details.
+    """
     from . import nngraph, instance
 
     w_out_use = None

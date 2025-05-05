@@ -46,6 +46,29 @@ def threed2twod(pts, indices=["x", "z"]):
 
 
 def non_isotropic_dist(pts_x, pts, idx, directionality_fac=0, directionality_axis=None, distance_func=None):
+    """
+    Calculates weights for picking edges of a random geometric graph based (mostly) on directionality, i.e.,
+    how well the direction of the vector from the source to the target node aligns with a specified axis.
+    Note that the potential nodes that can be connected to is calculated separately and is an input.
+
+    Args:
+      pts_x (numpy.array, m X 3): Locations in space of the potential source nodes.
+      
+      pts (numpy.array, m X 3): Locations in space of the potential target nodes. Note: In the manuscript we
+      only explore intrinsic connectivity, i.e., the case pts_x == pts. But here, we are prepared to also use
+      the function for connections from one population to another.
+      
+      idx (numpy.array of lists of ints): Indices of nodes to potentially connect to. 
+      One entry per node; the entry is a list of the indices of other nodes within distance d, i.e., that are
+      close enough to connect to.
+
+      directionality_fac (float): How strong the bias for edges in a specific direction is. w_A of the manuscript.
+
+      directionality_axis (numpy.array, shape=(3,)): The axis defining the prefered direction. A of the manuscript.
+
+      distance_func: Only used if no directionality (A and w_A) are specified. A function that yields values of
+      weights based on distance, such as exp(-distance). Not used in the manuscript.
+    """
     if distance_func is None:
         distance_func = lambda _x: 1.0
     A = pandas.DataFrame(pts_x[:, :3], columns=pandas.Index(["x", "y", "z"], name="coord"),
@@ -68,8 +91,22 @@ def non_isotropic_dist(pts_x, pts, idx, directionality_fac=0, directionality_axi
 
 
 def generate_custom_weights_by_node_class(reference, property_to_use, axis):
+    """
+    Generates "per node bias" weights based on the strengths of pathways in a reference connectome to match.
+    For details, see the "per node bias" subsection in the Methods of the manuscript.
+
+    Args:
+      reference (conntility.ConnectivityMatrix): A reference connectome whose pathway strengths we want to match.
+      
+      property_to_use (str): The name of a node property that must exist in the reference connectome above. 
+      Defines the pathways to match: Each pathway if a combination of possible values of the node property for
+      source and target nodes. Essentially: Neuron types.
+      
+      axis (0 to 1): If 0: Calculates biases for nodes as target nodes (w_i in the manuscript). If 1: same, but
+      as source nodes (w_o in the manuscript).
+    """
     c = reference.vertices[property_to_use].value_counts().sort_index()
-    nrml = c.values.reshape((-1, 1)) * c.values.reshape((1, -1)) + 1E-9 # Number of pairs
+    nrml = c.values.reshape((-1, 1)) * c.values.reshape((1, -1)) + 1E-9 # Number of pairs, avoiding div. by 0
 
     MM = reference.condense(property_to_use).array
     MM = MM / nrml  # Connection prob
@@ -81,6 +118,19 @@ def generate_custom_weights_by_node_class(reference, property_to_use, axis):
 
 
 def custom_weight_evaluation(w_out, w_in, idx):
+    """
+    Evaluates the "per node bias" weights (w_o and w_i in the manuscript) to yield one values for
+    each potential edge of the random geometric graph.
+
+    Args:
+      w_out (numpy.array): w_o of the manuscript. One entry per node.
+      
+      w_in (numpy.array): w_i of the manuscript. One entry per node.
+
+      idx (numpy.array of lists of ints): Indices of nodes to potentially connect to. 
+      One entry per node; the entry is a list of the indices of other nodes within distance d, i.e., that are
+      close enough to connect to.
+    """
     w_out = numpy.array(w_out)
     w_in = numpy.array(w_in)
 
@@ -97,6 +147,55 @@ def cand2_point_nn_matrix(pts, pts_x=None, n_neighbors=4, dist_neighbors=None, n
                     distance_func=None,
                     custom_w_out=None, custom_w_in=None,
                     no_diag=True, mirror=False):
+    """
+    Generates a random geometric graph with some modifications outlined in the manuscript.
+
+    Args:
+      pts (numpy.array, m X 3): Locations in space of the nodes.
+      
+      pts_x (optional, numpy.array, m X 3): If specified, pts_x is the locations of source nodes and pts the
+      locations of target nodes of the random geometric graph. If not specified, pts_x = pts. In the manuscript we
+      only explore intrinsic connectivity, i.e., the case pts_x == pts. But here, we are prepared to also use
+      the function for connections from one population to another.
+
+      n_neighbors (optional, int): One way of specifying the potential nodes to connect each node to. If given,
+      each node is potentially connected to the specified number of nearest neighbors. This method is NOT used
+      in the manuscript.
+
+      dist_neighbors (optional, float): The alternative way of specifying potential nodes. If given, each node 
+      potentially connected to nodes withing the specified distance. IF BOTH n_neighbors AND dist_neighbors IS
+      GIVEN, THE BEHAVIOR IS UNDEFINED!
+
+      n_pick (optional, int): One way of specifying the sparsity of the graph. Each node will be connected to 
+      exactly that number of other nodes, unless the number of potential targets is smaller than that. This method
+      is NOT used in the manuscript.
+
+      p_pick (optional, float): The alternative way of specifying the sparsity. Each node is connected to each of
+      its potential partners with that probability. IF BOTH n_pick AND p_pick IS GIVEN, THE BEHAVIOR IS UNDEFINED!
+
+      scale_axes (optional, numpy.array): Length must match the second dimension of pts and pts_x. Divides each
+      coordinate of the points by the corresponding value.
+
+      directionality_fac (float): How strong the bias for edges in a specific direction is. w_A of the manuscript.
+
+      directionality_axis (numpy.array, shape=(3,)): The axis defining the prefered direction. A of the manuscript.
+
+      distance_func: Only used if no directionality (A and w_A) are specified. A function that yields values of
+      weights based on distance, such as exp(-distance). Not used in the manuscript.
+
+      custom_w_out (numpy.array): Length must match length of pts_x. "per node bias" weights, i.e., w_o
+      of the manuscript. 
+
+      custom_w_out (numpy.array): Length must match length of pts. "per node bias" weights, i.e., w_i
+      of the manuscript. 
+
+      no_diag (bool; default: True): If set to False, connections from a node to itself are allowed. NOT used
+      in the manuscript.
+
+      mirror (bool; default: False): If set to True, the output matrix is made symmetrical. That is, if an edge
+      exists from a to b, the edge from b to a is also added, if it does not already exist. NOT used in the
+      manuscript.
+    """
     mirror = bool(mirror)
     if pts_x is None:
         pts_x = pts
