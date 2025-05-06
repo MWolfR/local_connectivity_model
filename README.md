@@ -42,15 +42,23 @@ Briefly, the files have four sections:
  "Configuration file? That is all too complicated for me. Just tell me how to build S_q(G_{d,p}(P)), as you define it in the manuscript".
 
 > import numpy
+> 
 > from pnagm.nngraph import cand2_point_nn_matrix
+> 
 > from pnagm.instance import build_instance
-
+>
+> 
 > P = numpy.random.rand(1000, 3) * 50
+>
 > p = 0.2  # parameter as defined in the manuscript
+>
 > d = 10  # as in the manuscript
+>
 > q = 2.5  # as in the manuscript
-
+>
+> 
 > G = cand2_point_nn_matrix(P, dist_neighbors=d, p_pick=p)  # Builds the random geometric graph
+>
 > S, _, _ = build_instance(P, G, step_tgt=q)  # Build stochastic spread graph on it
 
 # Notebooks
