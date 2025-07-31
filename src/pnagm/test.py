@@ -110,8 +110,9 @@ class DDtest(object):
 
         plt_kwargs = {
             "reference": {"color": "black", "lw": 1.5, "marker": "o", "ms": 5},
-            "model": {"color": "red", "lw": 0.5, "marker": "o", "ms": 3},
-            "control": {"color": "teal", "lw": 0.5, "marker": "o", "ms": 3}
+            mdl_sources_names[0]: {"color": "red", "lw": 0.5, "marker": "o", "ms": 3},
+            mdl_sources_names[1]: {"color": "teal", "lw": 0.5, "marker": "o", "ms": 3},
+            mdl_sources_names[2]: {"color": "rebeccapurple", "lw": 0.5, "marker": "o", "ms": 3}
         }
 
         fig = plt.figure(figsize=(5, 2.2))
@@ -231,8 +232,8 @@ class DDtest(object):
             self.simplex_counts_over_instances(_src)
             for _src in src_instances
         ]
-        fig = plt.figure(figsize=(8, 2))
-        axes = fig.subplots(1, 3, sharey=True, sharex=True)
+        fig = plt.figure(figsize=(11, 2))
+        axes = fig.subplots(1, 4, sharey=True, sharex=True)
 
         cols = {"Original": "black", "ER": "red", "Config. model": "orange", "Bishuffled model": "purple"}
 

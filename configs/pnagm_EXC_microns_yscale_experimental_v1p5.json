@@ -1,0 +1,29 @@
+{
+    "_comment": "The .h5 file holding the reference connectome below: DOI: 10.5281/zenodo.13849415",
+    "make_points": {
+        "root":"/Users/danielaegas/repos/local_connectivity_model/data",
+        "fn": "microns_mm3_connectome_v1181.h5",
+        "tgt_sz": 100000
+    },
+    "per_class_bias":{
+        "outgoing": "cell_type",
+        "incoming": "cell_type"
+    },
+    "nngraph": {
+        "directionality_fac": 0.33,
+        "directionality_axis": [0.0, 1.0, 0.0],
+        "dist_neighbors": 47.0,
+        "p_pick": 0.029,
+        "mirror": 0,
+        "scale_axes": [1.0, 2.25, 1.0]
+    },
+    "instance": {
+        "n_steps": 100,
+        "sum_exclusion": 1, 
+        "step_tgt": 2.52, 
+        "n_protected": 6,
+        "fac_protected": 1.0,
+        "tgt_level": "individual",
+        "decay": 1.0
+    }
+}
