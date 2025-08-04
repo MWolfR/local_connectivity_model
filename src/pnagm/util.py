@@ -35,7 +35,11 @@ def points_from_microns(cfg):
       cfg: dict configuring the process, i.e., which connectome to load and which subvolume to select.
     """
     import conntility
-    fn = cfg["fn"]
+
+    if "root" in cfg: 
+        fn = cfg["root"] + "/" + cfg["fn"]
+    else: 
+        fn = cfg["fn"]
     try:
         N = conntility.ConnectivityMatrix.from_h5(fn, "condensed")
     except:
