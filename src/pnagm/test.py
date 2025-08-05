@@ -22,7 +22,7 @@ class DDtest(object):
     NOTE: This class is very much optimized for use with the specific references connectomes we 
     considered in the manuscript and may require changes for other connectomes.
     """
-    def __init__(self, instance, cols=["x", "y", "z"]):
+    def __init__(self, instance, cols=["x", "y", "z"], max_2d_offset=50.0):
         """
         Args:
           instance (conntility.ConnectivityMatrix): The reference connectome
@@ -30,21 +30,23 @@ class DDtest(object):
           cols (list): The name of the node properties of the reference to use for distance calculations.
         """
         self.m = instance
+        self._max_2d_offset = max_2d_offset
         pts = self.m.vertices[cols].values
         self.pts = pts
 
         self.d = squareform(pdist(pts))
-        self.deltas = [
+        self.deltas = [  # offsets along all axes
             calc_delta_matrix(pts[:, a]) for a in range(pts.shape[1])
         ]
         self.h_all = numpy.histogram(self.d.flatten(), bins=dbins)[0]
         self.h_2d_all = dict([
             ((i, j),
             numpy.histogram2d(
-                self.deltas[i].flatten(), self.deltas[j].flatten(),
+                self.deltas[i].flatten()[numpy.abs(self.deltas[k].flatten()) < self._max_2d_offset],
+                self.deltas[j].flatten()[numpy.abs(self.deltas[k].flatten()) < self._max_2d_offset],
                 bins=(dbins2d, dbins2d)
             )[0])
-            for i, j in [(0, 1), (0, 2), (1, 2)]
+            for i, j, k in [(0, 1, 2), (0, 2, 1), (1, 2, 0)]
         ])
 
         self.p_ref = self.for_matrix(self.m.matrix)
@@ -60,9 +62,11 @@ class DDtest(object):
         coo = m.tocoo()
         assert ij in self.h_2d_all
         i, j = ij
+        k = [_dim for _dim in [0, 1, 2] if _dim not in ij][0]
+        mask = numpy.abs(self.deltas[k][coo.row, coo.col]) < self._max_2d_offset
         H = numpy.histogram2d(
-            self.deltas[i][coo.row, coo.col],
-            self.deltas[j][coo.row, coo.col],
+            self.deltas[i][coo.row, coo.col][mask],
+            self.deltas[j][coo.row, coo.col][mask],
             bins=(dbins2d, dbins2d))[0]
         return H / self.h_2d_all[ij]
 
