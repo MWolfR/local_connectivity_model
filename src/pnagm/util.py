@@ -1,4 +1,7 @@
 import numpy
+import h5py
+import pandas
+import os
 
 
 # For the random or non-random generation of neuron locations in space
@@ -25,7 +28,30 @@ def no_categorical_dtypes(N):
         if isinstance(N._vertex_properties[col].dtype, pandas.CategoricalDtype):
             N._vertex_properties[col] = N._vertex_properties[col].astype(str)
 
-def points_from_microns(cfg):
+def load_all_instances_from_file(fn):
+    """
+    Utility function to load all ConnectivityMatrix objects from an .h5 file. This function is not very
+    clever and strongly assumes that any group found in the .h5 file contains a ConnectivityMatrix, without
+    additional checks.
+    """
+    import conntility
+
+    grp_tuples = []
+    with h5py.File(fn, "r") as h5:
+        for prefix in h5.keys():
+            if isinstance(h5[prefix], h5py.Group):
+                for grp_name in h5[prefix].keys():
+                    if isinstance(h5[prefix][grp_name], h5py.Group):
+                        grp_tuples.append((prefix, grp_name))
+    matrices = [conntility.ConnectivityMatrix.from_h5(fn, group_name=grp_name,
+                                                      prefix=prefix)
+                for prefix, grp_name in grp_tuples]
+    matrices = conntility.ConnectivityGroup(
+        pandas.DataFrame({"instance": range(len(matrices))}), matrices
+    )
+    return matrices
+
+def points_from_microns(cfg, return_additional_controls=False):
     """
     Generate a point cloud by looking up soma locations from a reference connectome. The reference could
     be the MICrONS EM connectome, hence the name. But in principle any source can be used, as long as it 
@@ -75,6 +101,15 @@ def points_from_microns(cfg):
             print(len(N))
     
     pts = N.vertices[cols].values
+
+    if return_additional_controls:
+        additional_controls = {}
+        for add_ctrl_name, add_ctrl in cfg.get("additional_controls", {}).items():
+            ctrl_fn = add_ctrl["fn"]
+            if "root" in add_ctrl.keys():
+                ctrl_fn = os.path.join(add_ctrl["root"], ctrl_fn)
+            additional_controls[add_ctrl_name] = load_all_instances_from_file(ctrl_fn)
+        return pts, N, additional_controls
     return pts, N
 
 def create_neighbor_spread_graph(pts, cfg, reference=None):
