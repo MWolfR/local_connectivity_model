@@ -9,6 +9,7 @@
         "tgt_sz": 600,
         "additional_controls": {
             "PA": {
+                "_comment": "The .h5 file below is generated in notebook 'Fit other models to microns'. Run that first!",
                 "fn": "microns_PA_instance.h5"
             }
         }
