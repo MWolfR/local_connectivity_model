@@ -97,7 +97,7 @@ biorXiv; doi: 10.1101/2025.05.22.655546
   - Figure S3: **Microns nearest neighbor effect**
 
 ## Neuron morphological physicality and variability define the non-random structure of connectivity
-Not published yet
+biorXiv; doi: 10.1101/2025.08.21.671478
 
   - Figure 1A: Reproduced from a previous paper. Not in this repository
   - Figure 1B, C: Manually drawn cartoon
