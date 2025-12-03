@@ -101,12 +101,10 @@ biorXiv; doi: 10.1101/2025.08.21.671478
 
   - Figure 1A: Reproduced from a previous paper. Not in this repository
   - Figure 1B, C: Manually drawn cartoon
-  - Figure 1D1: **Nearest neighbor 1d prob increase** with the *data* connectome from 10.5281/zenodo.16744240 and 10.5281/zenodo.16744766 selecting "status_axon" in ["t"] as the filter for trustworthy outgoing connectivity and "No filtering" for incoming connectivity.
-  - Figure 1D2: **Nearest neighbor 1d prob increase** with the *control* connectome from 10.5281/zenodo.16744240 and https://doi.org/10.5281/zenodo.16744766 selecting "No filtering" for both outgoing connectivity and incoming connectivity.
-  - Figure 2A: **Nearest neighbor 2d prob increase** with the *data* connectome from 10.5281/zenodo.16744240
-  - Figure 2B: **Nearest neighbor 2d prob increase** with the *data* connectome from 10.5281/zenodo.16744766
-  - Figure 2C: **Nearest neighbor 2d prob increase** with the *data* connectome from 10.5281/zenodo.16744240 and a configuration model control of the same connectome (use the connectome-analysis package to generate)
-  - Figure 2D: **Nearest neighbor 2d prob increase** with the *data* connectome from 10.5281/zenodo.16744766 and the *control* connectome from 10.5281/zenodo.16744766
+  - Figure 2B1, B2, bottom: **Nearest neighbor 1d prob increase** with the connectomes from 10.5281/zenodo.16744240 and 10.5281/zenodo.16744766 selecting "status_axon" in ["t"] as the filter for trustworthy outgoing connectivity and "No filtering" for incoming connectivity.
+  - Figure 2B1, B2, top: **Nearest neighbor 1d prob increase** with the connectomes (data and control) from 10.5281/zenodo.16744766 selecting "No filtering" for both outgoing and incoming connectivity
+  - Figure 2C, E: **Nearest neighbor 2d prob increase** with the *data* connectome from 10.5281/zenodo.16744240 selecting "status_axon" in ["t"] as the filter for trustworthy outgoing connectivity and "No filtering" for incoming connectivity.
+  - Figure 2D, F: **Nearest neighbor 2d prob increase** with the *data* connectome from 10.5281/zenodo.16744766 selecting "No filtering" for both outgoing and incoming connectivity
   - Figure 3: **Conn prob correlations between spatial bins** with the *data* connectome from 10.5281/zenodo.16744240 and a configuration model control of the same connectome (use the connectome-analysis package to generate)
   - Figure 4A: **Draw explanatory cartoons**
   - Figure 4B-E: **Match and compare to microns** with config L45E_microns_yscale_experimental_v1p5.json
