@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20055048.svg)](https://doi.org/10.5281/zenodo.20055048)
+
 # Local connectivity model
 A stochastic graph model that captures non-random trends in local connectivity of neuronal circuitry.
 With a proof-of-concept extension to long-range connectivity.
